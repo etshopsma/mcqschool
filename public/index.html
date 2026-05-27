@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MCQSchool — Mock Test</title>
+    <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+
+<!-- =============================================
+     HOME SCREEN
+     ============================================= -->
+<div class="screen" id="homeScreen">
+    <div class="logo">MCQSchool</div>
+    <div class="subtitle">
+        Welcome to MCQSchool.<br><br>
+        Click the button below to start a 3-question random mock test
+        from our live question bank.
+    </div>
+    <div id="homeError" class="error-msg hidden"></div>
+    <div id="questionPoolInfo" style="color:#6b7280; font-size:14px; margin-bottom:20px;"></div>
+    <button id="startBtn">Start Mock Test</button>
+    <p style="margin-top: 18px; font-size: 13px; color: #9ca3af;">
+        Are you an admin?
+        <a href="/admin.html" style="color:#2563eb; text-decoration:none; font-weight:bold;">Go to Admin Panel →</a>
+    </p>
+</div>
+
+<!-- =============================================
+     QUIZ SCREEN
+     ============================================= -->
+<div class="screen hidden" id="quizScreen">
+    <div class="question-count" id="questionCount">Question 1 of 3</div>
+    <div class="question" id="questionText">Loading question...</div>
+    <div id="optionsContainer"></div>
+    <div id="quizError" class="error-msg hidden"></div>
+    <button class="next-btn" id="nextBtn">Next Question</button>
+</div>
+
+<!-- =============================================
+     RESULT SCREEN
+     ============================================= -->
+<div class="screen hidden" id="resultScreen">
+    <div class="result-title">Mock Test Result</div>
+
+    <div class="score-box">
+        <div class="score" id="scoreText">0/3</div>
+        <div class="stats">
+            Correct Answers: <span id="correctCount">0</span><br>
+            Wrong Answers:   <span id="wrongCount">0</span><br>
+            Accuracy:        <span id="accuracy">0%</span>
+        </div>
+    </div>
+
+    <h2 style="margin-bottom:20px; font-size:18px; color:#1e293b;">
+        Answer Review
+    </h2>
+
+    <div id="reviewContainer"></div>
+
+    <button class="restart-btn" id="restartBtn">Try Another Test</button>
+</div>
+
+<script src="/js/quiz.js"></script>
+</body>
+</html>
