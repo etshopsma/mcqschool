@@ -9,98 +9,165 @@
 <body>
 
 <!-- =============================================
-     ADMIN LOGIN SCREEN
+     LOGIN SCREEN
      ============================================= -->
-<div id="loginScreen" class="admin-login-wrap">
-    <div class="logo">MCQSchool</div>
-    <p class="subtitle">Admin Panel — Please log in to continue.</p>
+<div id="loginScreen" class="card login-card">
+    <div class="login-logo">MCQSchool</div>
+    <p class="login-sub">Admin Panel — Please log in to continue.</p>
 
     <div id="loginError" class="error-msg hidden"></div>
 
     <div class="form-group">
         <label>Username</label>
-        <input type="text" id="loginUsername" placeholder="Enter admin username" autocomplete="username">
+        <input type="text" id="loginUsername" placeholder="Admin username" autocomplete="username">
     </div>
 
     <div class="form-group">
         <label>Password</label>
-        <input type="password" id="loginPassword" placeholder="Enter admin password" autocomplete="current-password">
+        <input type="password" id="loginPassword" placeholder="Admin password" autocomplete="current-password">
     </div>
 
-    <button id="loginBtn" style="width:100%;">Login</button>
+    <button class="btn-primary" id="loginBtn" style="width:100%; margin-top:6px;">Login</button>
 
-    <p style="margin-top: 18px; font-size: 13px; color: #9ca3af; text-align:center;">
+    <p style="margin-top:18px; font-size:13px; color:#94a3b8; text-align:center; font-weight:600;">
         <a href="/" style="color:#2563eb; text-decoration:none;">← Back to Quiz</a>
     </p>
 </div>
 
 <!-- =============================================
-     ADMIN DASHBOARD (shown after login)
+     ADMIN DASHBOARD
      ============================================= -->
 <div id="adminDashboard" class="hidden">
 
-    <!-- Add Question Panel -->
-    <div class="admin-panel">
-        <div class="admin-header">
-            <div>
-                <div class="admin-title">🛠️ Admin Dashboard</div>
-                <div style="font-size:13px; color:#6b7280; margin-top:3px;">
-                    Logged in as <strong>Admin</strong>
-                </div>
+    <!-- ADD QUESTION PANEL -->
+    <div class="card admin-card">
+        <div class="admin-header-row">
+            <div class="admin-title-block">
+                <h2>🛠️ Admin Dashboard</h2>
+                <p>Logged in as <strong>Admin</strong></p>
             </div>
-            <button class="logout-btn" id="logoutBtn">Logout</button>
+            <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+                <a href="/" style="font-size:13px; color:#2563eb; text-decoration:none; font-weight:700;">
+                    ← View Quiz Site
+                </a>
+                <button class="btn-danger" id="logoutBtn">Logout</button>
+            </div>
         </div>
 
-        <!-- Add New Question Form -->
-        <div class="section-title">➕ Add New Question</div>
-
+        <div class="sub-heading">➕ Add New Question</div>
         <div id="addError" class="error-msg hidden"></div>
 
-        <div class="form-group">
-            <label>Question Text</label>
-            <input type="text" id="adminQuestion" placeholder="e.g., What is 2 + 2?">
+        <!-- Row 1: Class + Branch -->
+        <div class="form-row">
+            <div class="form-group">
+                <label>Class</label>
+                <select id="adminClass">
+                    <option value="">— Select Class —</option>
+                    <option value="1">Class 1</option>
+                    <option value="2">Class 2</option>
+                    <option value="3">Class 3</option>
+                    <option value="4">Class 4</option>
+                    <option value="5">Class 5</option>
+                    <option value="6">Class 6</option>
+                    <option value="7">Class 7</option>
+                    <option value="8">Class 8</option>
+                    <option value="9">Class 9</option>
+                    <option value="10">Class 10</option>
+                    <option value="11">Class 11</option>
+                    <option value="12">Class 12</option>
+                </select>
+            </div>
+
+            <!-- Branch: only shown when class >= 9 -->
+            <div class="form-group" id="branchGroup" style="display:none;">
+                <label>Branch</label>
+                <select id="adminBranch">
+                    <option value="">— Select Branch —</option>
+                    <option value="Science">Science</option>
+                    <option value="Humanities">Humanities</option>
+                    <option value="Business Studies">Business Studies</option>
+                </select>
+            </div>
         </div>
 
-        <div class="form-group">
-            <label>Option 1</label>
-            <input type="text" id="adminOpt1" placeholder="First option">
+        <!-- Row 2: Subject + Chapter -->
+        <div class="form-row">
+            <div class="form-group">
+                <label>Subject</label>
+                <input type="text" id="adminSubject" placeholder="e.g. Physics, Mathematics">
+            </div>
+            <div class="form-group">
+                <label>Chapter</label>
+                <input type="text" id="adminChapter" placeholder="e.g. Chapter 1: Motion">
+            </div>
         </div>
 
+        <!-- Question text -->
         <div class="form-group">
-            <label>Option 2</label>
-            <input type="text" id="adminOpt2" placeholder="Second option">
+            <label>Question</label>
+            <input type="text" id="adminQuestion" placeholder="Type the question here...">
         </div>
 
-        <div class="form-group">
-            <label>Option 3</label>
-            <input type="text" id="adminOpt3" placeholder="Third option">
+        <!-- Options -->
+        <div class="form-row">
+            <div class="form-group">
+                <label>Option 1</label>
+                <input type="text" id="adminOpt1" placeholder="First option">
+            </div>
+            <div class="form-group">
+                <label>Option 2</label>
+                <input type="text" id="adminOpt2" placeholder="Second option">
+            </div>
         </div>
 
-        <div class="form-group">
-            <label>Option 4</label>
-            <input type="text" id="adminOpt4" placeholder="Fourth option">
+        <div class="form-row">
+            <div class="form-group">
+                <label>Option 3</label>
+                <input type="text" id="adminOpt3" placeholder="Third option">
+            </div>
+            <div class="form-group">
+                <label>Option 4</label>
+                <input type="text" id="adminOpt4" placeholder="Fourth option">
+            </div>
         </div>
 
+        <!-- Correct Answer -->
         <div class="form-group">
             <label>Correct Answer (must match one option exactly)</label>
-            <input type="text" id="adminCorrect" placeholder="Type the correct option here exactly">
+            <input type="text" id="adminCorrect" placeholder="Copy-paste the correct option here">
         </div>
 
-        <button class="green-btn" id="addQuestionBtn">Add Question to Database</button>
-        <div class="pool-counter" id="poolCounter">Loading question count...</div>
+        <button class="btn-success" id="addQuestionBtn">Add Question to Database</button>
+        <div class="pool-info" id="poolCounter">Loading...</div>
     </div>
 
-    <!-- Questions List Panel -->
-    <div class="admin-panel">
-        <div class="admin-title">📋 All Questions in Database</div>
+    <!-- QUESTIONS LIST PANEL -->
+    <div class="card admin-card">
+        <div class="sub-heading">📋 All Questions</div>
+
+        <!-- Filter row -->
+        <div class="form-row" style="margin-bottom:16px;">
+            <div class="form-group" style="margin:0;">
+                <label>Filter by Class</label>
+                <select id="filterClass">
+                    <option value="">All Classes</option>
+                </select>
+            </div>
+            <div class="form-group" style="margin:0;">
+                <label>Filter by Subject</label>
+                <select id="filterSubject">
+                    <option value="">All Subjects</option>
+                </select>
+            </div>
+        </div>
+
         <div id="questionsTableWrap">
-            <p class="loading-msg">Loading questions...</p>
+            <p style="color:#94a3b8; font-style:italic;">Loading questions...</p>
         </div>
     </div>
 
 </div>
 
-<!-- Success Toast -->
 <div class="toast" id="toast"></div>
 
 <script src="/js/admin.js"></script>

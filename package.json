@@ -1,7 +1,7 @@
 {
   "name": "mcqschool",
-  "version": "1.0.0",
-  "description": "MCQSchool - Online MCQ Test Platform with Admin Panel",
+  "version": "2.0.0",
+  "description": "MCQSchool — Class > Branch > Subject > Chapter MCQ Platform",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",

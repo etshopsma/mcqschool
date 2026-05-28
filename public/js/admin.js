@@ -1,99 +1,76 @@
 // =============================================
-// admin.js — Admin Panel Frontend Logic
-// Handles: login, session check, add question,
-//          delete question, list all questions
+// admin.js — MCQSchool Admin Panel
+// Handles: login, add question (with class/branch/subject/chapter),
+//          delete, filter table
 // =============================================
 
-// ---- Element References ----
+// ---- Elements ----
 const loginScreen    = document.getElementById('loginScreen');
 const adminDashboard = document.getElementById('adminDashboard');
-
-const loginUsername  = document.getElementById('loginUsername');
-const loginPassword  = document.getElementById('loginPassword');
-const loginBtn       = document.getElementById('loginBtn');
 const loginError     = document.getElementById('loginError');
-
-const logoutBtn      = document.getElementById('logoutBtn');
-
-const addQuestionBtn = document.getElementById('addQuestionBtn');
-const poolCounter    = document.getElementById('poolCounter');
 const addError       = document.getElementById('addError');
 const toast          = document.getElementById('toast');
 
 // =============================================
-// On page load — check if already logged in
+// On load: check session
 // =============================================
 window.addEventListener('DOMContentLoaded', async () => {
     try {
         const res  = await fetch('/api/admin/status');
         const data = await res.json();
-
-        if (data.isAdmin) {
-            showDashboard();
-        }
-    } catch {
-        // Server unreachable — stay on login
-    }
+        if (data.isAdmin) showDashboard();
+    } catch { /* stay on login */ }
 });
 
 // =============================================
 // LOGIN
 // =============================================
-loginBtn.addEventListener('click', async () => {
-    const username = loginUsername.value.trim();
-    const password = loginPassword.value.trim();
-
+document.getElementById('loginBtn').addEventListener('click', async () => {
+    const username = document.getElementById('loginUsername').value.trim();
+    const password = document.getElementById('loginPassword').value.trim();
     loginError.classList.add('hidden');
 
     if (!username || !password) {
-        showLoginError('Please enter both username and password.');
+        showEl(loginError, 'Please enter both username and password.');
         return;
     }
 
-    loginBtn.disabled    = true;
-    loginBtn.textContent = 'Logging in...';
+    const btn = document.getElementById('loginBtn');
+    btn.disabled = true; btn.textContent = 'Logging in...';
 
     try {
         const res  = await fetch('/api/admin/login', {
-            method:  'POST',
+            method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body:    JSON.stringify({ username, password })
+            body: JSON.stringify({ username, password }),
         });
-
         const data = await res.json();
 
         if (data.success) {
-            loginPassword.value = '';
-            loginUsername.value = '';
+            document.getElementById('loginPassword').value = '';
+            document.getElementById('loginUsername').value = '';
             showDashboard();
         } else {
-            showLoginError(data.message || 'Login failed. Check your credentials.');
+            showEl(loginError, data.message || 'Invalid credentials.');
         }
-
     } catch {
-        showLoginError('Could not connect to server. Is it running?');
+        showEl(loginError, 'Cannot connect to server.');
     } finally {
-        loginBtn.disabled    = false;
-        loginBtn.textContent = 'Login';
+        btn.disabled = false; btn.textContent = 'Login';
     }
 });
 
-// Allow pressing Enter in password field to submit
-loginPassword.addEventListener('keydown', e => {
-    if (e.key === 'Enter') loginBtn.click();
-});
-loginUsername.addEventListener('keydown', e => {
-    if (e.key === 'Enter') loginBtn.click();
+['loginPassword','loginUsername'].forEach(id => {
+    document.getElementById(id).addEventListener('keydown', e => {
+        if (e.key === 'Enter') document.getElementById('loginBtn').click();
+    });
 });
 
 // =============================================
 // LOGOUT
 // =============================================
-logoutBtn.addEventListener('click', async () => {
-    try {
-        await fetch('/api/admin/logout', { method: 'POST' });
-    } catch { /* ignore */ }
-
+document.getElementById('logoutBtn').addEventListener('click', async () => {
+    await fetch('/api/admin/logout', { method: 'POST' }).catch(() => {});
     adminDashboard.classList.add('hidden');
     loginScreen.classList.remove('hidden');
 });
@@ -104,25 +81,32 @@ logoutBtn.addEventListener('click', async () => {
 async function showDashboard() {
     loginScreen.classList.add('hidden');
     adminDashboard.classList.remove('hidden');
-    await refreshData();
+    await Promise.all([ refreshCount(), loadTable() ]);
 }
 
 // =============================================
-// REFRESH: question count + table
+// SHOW/HIDE BRANCH FIELD BASED ON CLASS
 // =============================================
-async function refreshData() {
-    await Promise.all([
-        refreshCount(),
-        loadQuestionsTable()
-    ]);
-}
+document.getElementById('adminClass').addEventListener('change', function () {
+    const val = parseInt(this.value);
+    const branchGroup = document.getElementById('branchGroup');
+    if (val >= 9) {
+        branchGroup.style.display = 'block';
+    } else {
+        branchGroup.style.display = 'none';
+        document.getElementById('adminBranch').value = '';
+    }
+});
 
+// =============================================
+// REFRESH COUNT
+// =============================================
 async function refreshCount() {
     try {
         const res  = await fetch('/api/questions/count');
         const data = await res.json();
         if (data.success) {
-            poolCounter.textContent =
+            document.getElementById('poolCounter').textContent =
                 `Total questions in database: ${data.count}`;
         }
     } catch { /* ignore */ }
@@ -131,9 +115,13 @@ async function refreshCount() {
 // =============================================
 // ADD QUESTION
 // =============================================
-addQuestionBtn.addEventListener('click', async () => {
+document.getElementById('addQuestionBtn').addEventListener('click', async () => {
     addError.classList.add('hidden');
 
+    const classLevel    = document.getElementById('adminClass').value;
+    const branch        = document.getElementById('adminBranch').value.trim();
+    const subject       = document.getElementById('adminSubject').value.trim();
+    const chapter       = document.getElementById('adminChapter').value.trim();
     const question      = document.getElementById('adminQuestion').value.trim();
     const option1       = document.getElementById('adminOpt1').value.trim();
     const option2       = document.getElementById('adminOpt2').value.trim();
@@ -141,56 +129,68 @@ addQuestionBtn.addEventListener('click', async () => {
     const option4       = document.getElementById('adminOpt4').value.trim();
     const correct_answer = document.getElementById('adminCorrect').value.trim();
 
-    if (!question || !option1 || !option2 || !option3 || !option4 || !correct_answer) {
-        showAddError('Please fill in all fields before submitting.');
+    // Validation
+    if (!classLevel) { showEl(addError, 'Please select a class.'); return; }
+
+    const classNum = parseInt(classLevel);
+    if (classNum >= 9 && !branch) {
+        showEl(addError, 'Branch is required for Class 9 and above.');
+        return;
+    }
+    if (!subject || !chapter || !question ||
+        !option1 || !option2 || !option3 || !option4 || !correct_answer) {
+        showEl(addError, 'All fields are required. Please fill everything in.');
+        return;
+    }
+    if (![option1, option2, option3, option4].includes(correct_answer)) {
+        showEl(addError, 'Correct answer must exactly match one of the four options (try copy-paste).');
         return;
     }
 
-    const opts = [option1, option2, option3, option4];
-    if (!opts.includes(correct_answer)) {
-        showAddError('The correct answer must exactly match one of the four options (copy-paste to be sure).');
-        return;
-    }
-
-    addQuestionBtn.disabled    = true;
-    addQuestionBtn.textContent = 'Adding...';
+    const btn = document.getElementById('addQuestionBtn');
+    btn.disabled = true; btn.textContent = 'Adding...';
 
     try {
         const res = await fetch('/api/questions', {
-            method:  'POST',
+            method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body:    JSON.stringify({ question, option1, option2, option3, option4, correct_answer })
+            body: JSON.stringify({
+                class_level: classLevel, branch, subject, chapter,
+                question, option1, option2, option3, option4, correct_answer,
+            }),
         });
 
         const data = await res.json();
 
         if (data.success) {
-            // Clear form
-            ['adminQuestion','adminOpt1','adminOpt2','adminOpt3','adminOpt4','adminCorrect']
+            // Clear form (keep class & branch)
+            ['adminSubject','adminChapter','adminQuestion',
+             'adminOpt1','adminOpt2','adminOpt3','adminOpt4','adminCorrect']
                 .forEach(id => document.getElementById(id).value = '');
 
-            poolCounter.textContent = `Total questions in database: ${data.totalCount}`;
+            document.getElementById('poolCounter').textContent =
+                `Total questions in database: ${data.totalCount}`;
+
             showToast('✅ Question added successfully!');
-            await loadQuestionsTable();
-
+            await loadTable();
         } else {
-            showAddError(data.message || 'Failed to add question.');
+            showEl(addError, data.message || 'Failed to add question.');
         }
-
     } catch {
-        showAddError('Server error. Could not add question.');
+        showEl(addError, 'Server error. Could not add question.');
     } finally {
-        addQuestionBtn.disabled    = false;
-        addQuestionBtn.textContent = 'Add Question to Database';
+        btn.disabled = false; btn.textContent = 'Add Question to Database';
     }
 });
 
 // =============================================
 // LOAD QUESTIONS TABLE
 // =============================================
-async function loadQuestionsTable() {
+let allQuestions = [];
+
+async function loadTable() {
     const wrap = document.getElementById('questionsTableWrap');
-    wrap.innerHTML = '<p class="loading-msg">Loading questions...</p>';
+    wrap.innerHTML = '<p style="color:#94a3b8; font-style:italic; font-weight:600;">Loading questions...</p>';
 
     try {
         const res  = await fetch('/api/questions');
@@ -201,63 +201,99 @@ async function loadQuestionsTable() {
             return;
         }
 
-        if (data.questions.length === 0) {
-            wrap.innerHTML = '<p class="loading-msg">No questions yet. Add some above!</p>';
-            return;
-        }
-
-        let html = `
-            <table class="questions-table">
-                <thead>
-                    <tr>
-                        <th>#</th>
-                        <th>Question</th>
-                        <th>Options</th>
-                        <th>Correct Answer</th>
-                        <th>Action</th>
-                    </tr>
-                </thead>
-                <tbody>
-        `;
-
-        data.questions.forEach((q, i) => {
-            html += `
-                <tr>
-                    <td>${i + 1}</td>
-                    <td>${escapeHtml(q.question)}</td>
-                    <td style="line-height:1.8;">
-                        ${escapeHtml(q.option1)}<br>
-                        ${escapeHtml(q.option2)}<br>
-                        ${escapeHtml(q.option3)}<br>
-                        ${escapeHtml(q.option4)}
-                    </td>
-                    <td><strong style="color:#16a34a;">${escapeHtml(q.correct_answer)}</strong></td>
-                    <td>
-                        <button class="delete-btn"
-                            data-id="${q.id}"
-                            data-q="${escapeHtml(q.question)}">
-                            Delete
-                        </button>
-                    </td>
-                </tr>
-            `;
-        });
-
-        html += '</tbody></table>';
-        wrap.innerHTML = html;
-
-        // Attach delete handlers
-        wrap.querySelectorAll('.delete-btn').forEach(btn => {
-            btn.addEventListener('click', () => {
-                const id = btn.getAttribute('data-id');
-                const qText = btn.getAttribute('data-q');
-                deleteQuestion(id, qText);
-            });
-        });
+        allQuestions = data.questions;
+        populateFilters(allQuestions);
+        renderTable(allQuestions);
 
     } catch {
-        wrap.innerHTML = '<p class="error-msg">Failed to load questions from server.</p>';
+        wrap.innerHTML = '<p class="error-msg">Failed to load questions.</p>';
     }
+}
+
+function populateFilters(questions) {
+    const classSet   = [...new Set(questions.map(q => q.class_level))].sort((a,b) => a-b);
+    const subjectSet = [...new Set(questions.map(q => q.subject))].sort();
+
+    const fc = document.getElementById('filterClass');
+    const fs = document.getElementById('filterSubject');
+
+    const curClass   = fc.value;
+    const curSubject = fs.value;
+
+    fc.innerHTML = '<option value="">All Classes</option>' +
+        classSet.map(c => `<option value="${c}" ${c == curClass ? 'selected':''}>Class ${c}</option>`).join('');
+
+    fs.innerHTML = '<option value="">All Subjects</option>' +
+        subjectSet.map(s => `<option value="${s}" ${s === curSubject ? 'selected':''}>
+            ${escapeHtml(s)}</option>`).join('');
+}
+
+// Filter handlers
+document.getElementById('filterClass').addEventListener('change', applyFilter);
+document.getElementById('filterSubject').addEventListener('change', applyFilter);
+
+function applyFilter() {
+    const cls = document.getElementById('filterClass').value;
+    const sub = document.getElementById('filterSubject').value;
+
+    let filtered = allQuestions;
+    if (cls) filtered = filtered.filter(q => q.class_level == cls);
+    if (sub) filtered = filtered.filter(q => q.subject === sub);
+
+    renderTable(filtered);
+}
+
+function renderTable(questions) {
+    const wrap = document.getElementById('questionsTableWrap');
+
+    if (questions.length === 0) {
+        wrap.innerHTML = '<p style="color:#94a3b8; font-style:italic; font-weight:600; text-align:center; padding:20px 0;">No questions match the current filter.</p>';
+        return;
+    }
+
+    let html = `
+        <table class="q-table">
+            <thead>
+                <tr>
+                    <th>#</th>
+                    <th>Class / Branch</th>
+                    <th>Subject / Chapter</th>
+                    <th>Question</th>
+                    <th>Correct Answer</th>
+                    <th>Delete</th>
+                </tr>
+            </thead>
+            <tbody>
+    `;
+
+    questions.forEach((q, i) => {
+        html += `
+            <tr>
+                <td>${i + 1}</td>
+                <td>
+                    <span class="badge badge-blue">Class ${q.class_level}</span>
+                    ${q.branch
+                        ? `<br><span class="badge badge-purple" style="margin-top:4px;">${escapeHtml(q.branch)}</span>`
+                        : ''}
+                </td>
+                <td>
+                    <div style="font-weight:700;">${escapeHtml(q.subject)}</div>
+                    <div style="font-size:12px; color:#64748b; margin-top:2px;">${escapeHtml(q.chapter)}</div>
+                </td>
+                <td style="max-width:250px;">${escapeHtml(q.question)}</td>
+                <td><span class="badge badge-green">${escapeHtml(q.correct_answer)}</span></td>
+                <td>
+                    <button class="btn-danger" style="padding:5px 12px; font-size:12px;"
+                        onclick="deleteQuestion(${q.id}, '${escapeAttr(q.question)}')">
+                        Delete
+                    </button>
+                </td>
+            </tr>
+        `;
+    });
+
+    html += '</tbody></table>';
+    wrap.innerHTML = html;
 }
 
 // =============================================
@@ -275,30 +311,25 @@ async function deleteQuestion(id, questionText) {
         const data = await res.json();
 
         if (data.success) {
-            poolCounter.textContent = `Total questions in database: ${data.totalCount}`;
+            document.getElementById('poolCounter').textContent =
+                `Total questions in database: ${data.totalCount}`;
             showToast('🗑️ Question deleted.');
-            await loadQuestionsTable();
+            await loadTable();
         } else {
             alert('Failed to delete: ' + data.message);
         }
-
     } catch {
-        alert('Server error. Could not delete question.');
+        alert('Server error. Could not delete.');
     }
 }
 
 // =============================================
-// Helpers
+// HELPERS
 // =============================================
-function showLoginError(msg) {
-    loginError.textContent = msg;
-    loginError.classList.remove('hidden');
-}
-
-function showAddError(msg) {
-    addError.textContent = msg;
-    addError.classList.remove('hidden');
-    addError.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+function showEl(el, msg) {
+    el.textContent = msg;
+    el.classList.remove('hidden');
+    el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 }
 
 function showToast(msg) {
@@ -308,7 +339,11 @@ function showToast(msg) {
 }
 
 function escapeHtml(str) {
-    const div = document.createElement('div');
-    div.appendChild(document.createTextNode(String(str)));
-    return div.innerHTML;
+    const d = document.createElement('div');
+    d.appendChild(document.createTextNode(String(str)));
+    return d.innerHTML;
+}
+
+function escapeAttr(str) {
+    return String(str).replace(/'/g, "\\'");
 }

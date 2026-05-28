@@ -8,58 +8,126 @@
 </head>
 <body>
 
+<!-- Top Bar -->
+<div class="top-bar">
+    <div class="logo-text">MCQSchool</div>
+    <a class="admin-link" href="/admin.html">Admin Panel →</a>
+</div>
+
+<!-- Breadcrumb (shown during navigation) -->
+<div class="breadcrumb hidden" id="breadcrumb"></div>
+
 <!-- =============================================
-     HOME SCREEN
+     SCREEN 1: SELECT CLASS
      ============================================= -->
-<div class="screen" id="homeScreen">
-    <div class="logo">MCQSchool</div>
-    <div class="subtitle">
-        Welcome to MCQSchool.<br><br>
-        Click the button below to start a 3-question random mock test
-        from our live question bank.
+<div class="card" id="classScreen">
+    <div class="section-header">
+        <h2>📚 Choose Your Class</h2>
+        <p>Select your class to start a chapter-wise mock test</p>
     </div>
-    <div id="homeError" class="error-msg hidden"></div>
-    <div id="questionPoolInfo" style="color:#6b7280; font-size:14px; margin-bottom:20px;"></div>
-    <button id="startBtn">Start Mock Test</button>
-    <p style="margin-top: 18px; font-size: 13px; color: #9ca3af;">
-        Are you an admin?
-        <a href="/admin.html" style="color:#2563eb; text-decoration:none; font-weight:bold;">Go to Admin Panel →</a>
+
+    <div id="classError" class="error-msg hidden"></div>
+
+    <div class="class-divider">Junior — Class 1 to 8</div>
+    <div class="class-grid" id="juniorGrid"></div>
+
+    <div class="class-divider" style="margin-top:20px;">Senior — Class 9 to 12</div>
+    <div class="class-grid" id="seniorGrid"></div>
+
+    <p id="noClassMsg" class="hidden" style="color:#64748b; font-style:italic; margin-top:12px;">
+        No classes available yet. Ask the admin to add questions.
     </p>
 </div>
 
 <!-- =============================================
-     QUIZ SCREEN
+     SCREEN 2: SELECT BRANCH (Class 9–12 only)
      ============================================= -->
-<div class="screen hidden" id="quizScreen">
-    <div class="question-count" id="questionCount">Question 1 of 3</div>
-    <div class="question" id="questionText">Loading question...</div>
-    <div id="optionsContainer"></div>
-    <div id="quizError" class="error-msg hidden"></div>
-    <button class="next-btn" id="nextBtn">Next Question</button>
+<div class="card hidden" id="branchScreen">
+    <div class="section-header">
+        <h2>🌿 Choose Your Branch</h2>
+        <p id="branchSubtitle">Select your academic branch</p>
+    </div>
+    <div id="branchError" class="error-msg hidden"></div>
+    <div class="select-grid" id="branchGrid"></div>
 </div>
 
 <!-- =============================================
-     RESULT SCREEN
+     SCREEN 3: SELECT SUBJECT
      ============================================= -->
-<div class="screen hidden" id="resultScreen">
-    <div class="result-title">Mock Test Result</div>
+<div class="card hidden" id="subjectScreen">
+    <div class="section-header">
+        <h2>📖 Choose a Subject</h2>
+        <p id="subjectSubtitle">Select the subject you want to be tested on</p>
+    </div>
+    <div id="subjectError" class="error-msg hidden"></div>
+    <div class="item-list" id="subjectList"></div>
+</div>
 
-    <div class="score-box">
-        <div class="score" id="scoreText">0/3</div>
-        <div class="stats">
-            Correct Answers: <span id="correctCount">0</span><br>
-            Wrong Answers:   <span id="wrongCount">0</span><br>
-            Accuracy:        <span id="accuracy">0%</span>
+<!-- =============================================
+     SCREEN 4: SELECT CHAPTER
+     ============================================= -->
+<div class="card hidden" id="chapterScreen">
+    <div class="section-header">
+        <h2>📝 Choose a Chapter</h2>
+        <p id="chapterSubtitle">Select the chapter for your mock test</p>
+    </div>
+    <div id="chapterError" class="error-msg hidden"></div>
+    <div class="item-list" id="chapterList"></div>
+</div>
+
+<!-- =============================================
+     SCREEN 5: QUIZ
+     ============================================= -->
+<div class="card hidden" id="quizScreen">
+    <div class="quiz-meta">
+        <div class="quiz-path" id="quizPath"></div>
+        <div class="quiz-progress-label" id="quizProgressLabel">1 / 10</div>
+    </div>
+    <div class="progress-bar-wrap">
+        <div class="progress-bar-fill" id="progressBar" style="width:0%"></div>
+    </div>
+
+    <div class="question-text" id="questionText"></div>
+    <div id="optionsContainer"></div>
+    <div id="quizError" class="error-msg hidden"></div>
+    <button class="btn-primary" id="nextBtn" style="margin-top:8px;">Next Question</button>
+</div>
+
+<!-- =============================================
+     SCREEN 6: RESULT
+     ============================================= -->
+<div class="card hidden" id="resultScreen">
+    <div class="result-path" id="resultPath"></div>
+
+    <div class="score-circle-wrap">
+        <div class="score-circle">
+            <div class="score-number" id="scoreNumber">0/0</div>
+            <div class="score-label">Score</div>
         </div>
     </div>
 
-    <h2 style="margin-bottom:20px; font-size:18px; color:#1e293b;">
-        Answer Review
-    </h2>
+    <div class="stats-row">
+        <div class="stat-box correct">
+            <div class="stat-num" id="statCorrect">0</div>
+            <div class="stat-lbl">Correct</div>
+        </div>
+        <div class="stat-box wrong">
+            <div class="stat-num" id="statWrong">0</div>
+            <div class="stat-lbl">Wrong</div>
+        </div>
+        <div class="stat-box acc">
+            <div class="stat-num" id="statAccuracy">0%</div>
+            <div class="stat-lbl">Accuracy</div>
+        </div>
+    </div>
 
+    <div class="review-title">Answer Review</div>
     <div id="reviewContainer"></div>
 
-    <button class="restart-btn" id="restartBtn">Try Another Test</button>
+    <div class="result-actions">
+        <button class="btn-primary" id="retryBtn">🔁 Retry This Chapter</button>
+        <button class="btn-secondary" id="newTestBtn">🏠 Back to Classes</button>
+    </div>
 </div>
 
 <script src="/js/quiz.js"></script>

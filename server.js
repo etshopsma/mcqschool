@@ -1,20 +1,21 @@
 // =============================================
-// server.js — Main Express Application
-// MCQSchool Backend Server
+// server.js — MCQSchool Backend
+// Supports: Class > Subject > Chapter (Class 1–8)
+//           Class > Branch > Subject > Chapter (Class 9–12)
 // =============================================
 
 require('dotenv').config();
 
-const express        = require('express');
-const session        = require('express-session');
-const { Pool }       = require('pg');
-const path           = require('path');
+const express  = require('express');
+const session  = require('express-session');
+const { Pool } = require('pg');
+const path     = require('path');
 
 const app  = express();
 const PORT = process.env.PORT || 3000;
 
 // =============================================
-// PostgreSQL Connection Pool
+// PostgreSQL Connection
 // =============================================
 const pool = new Pool({
     host:     process.env.DB_HOST     || 'localhost',
@@ -25,11 +26,10 @@ const pool = new Pool({
     ssl: process.env.DB_SSL === 'true' ? { rejectUnauthorized: false } : false,
 });
 
-// Test DB connection on startup
 pool.connect((err, client, release) => {
     if (err) {
         console.error('❌  Database connection failed:', err.message);
-        console.error('    Please check your .env DB settings and ensure PostgreSQL is running.');
+        console.error('    Check your .env DB settings.');
     } else {
         release();
         console.log('✅  Connected to PostgreSQL database.');
@@ -37,7 +37,7 @@ pool.connect((err, client, release) => {
 });
 
 // =============================================
-// Admin Credentials (hardcoded as required)
+// Admin Credentials
 // =============================================
 const ADMIN_USERNAME = 'Admin';
 const ADMIN_PASSWORD = '786786';
@@ -47,175 +47,294 @@ const ADMIN_PASSWORD = '786786';
 // =============================================
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-
-// Serve all static files from /public
 app.use(express.static(path.join(__dirname, 'public')));
-
-// Session middleware
 app.use(session({
-    secret:            process.env.SESSION_SECRET || 'mcqschool-default-secret',
+    secret:            process.env.SESSION_SECRET || 'mcqschool-secret',
     resave:            false,
     saveUninitialized: false,
-    cookie: {
-        secure:   false,       // set true if using HTTPS in production
-        httpOnly: true,
-        maxAge:   1000 * 60 * 60  // 1 hour session lifetime
-    }
+    cookie: { secure: false, httpOnly: true, maxAge: 1000 * 60 * 60 }
 }));
 
 // =============================================
-// Auth Middleware — protects admin-only routes
+// Auth Middleware
 // =============================================
 function requireAdmin(req, res, next) {
-    if (req.session && req.session.isAdmin === true) {
-        return next();
-    }
-    return res.status(403).json({
-        success: false,
-        message: 'Unauthorized. Admin login required.'
-    });
+    if (req.session && req.session.isAdmin === true) return next();
+    return res.status(403).json({ success: false, message: 'Unauthorized.' });
 }
 
 // =============================================
-// ROUTE: Admin Login
-// POST /api/admin/login
-// Body: { username, password }
+// ADMIN AUTH ROUTES
 // =============================================
 app.post('/api/admin/login', (req, res) => {
     const { username, password } = req.body;
-
     if (username === ADMIN_USERNAME && password === ADMIN_PASSWORD) {
         req.session.isAdmin = true;
-        return res.json({ success: true, message: 'Login successful.' });
+        return res.json({ success: true });
     }
-
-    return res.status(401).json({
-        success: false,
-        message: 'Invalid username or password.'
-    });
+    return res.status(401).json({ success: false, message: 'Invalid credentials.' });
 });
 
-// =============================================
-// ROUTE: Admin Logout
-// POST /api/admin/logout
-// =============================================
 app.post('/api/admin/logout', (req, res) => {
-    req.session.destroy(err => {
-        if (err) {
-            return res.status(500).json({ success: false, message: 'Logout failed.' });
-        }
+    req.session.destroy(() => {
         res.clearCookie('connect.sid');
-        return res.json({ success: true, message: 'Logged out successfully.' });
+        return res.json({ success: true });
     });
 });
 
-// =============================================
-// ROUTE: Check Admin Auth Status
-// GET /api/admin/status
-// Returns whether the current session is admin
-// =============================================
 app.get('/api/admin/status', (req, res) => {
-    return res.json({
-        isAdmin: !!(req.session && req.session.isAdmin)
-    });
+    return res.json({ isAdmin: !!(req.session && req.session.isAdmin) });
 });
 
 // =============================================
-// ROUTE: Get Random Questions (Public)
-// GET /api/questions/random?count=3
-// Used by the quiz to load a test
+// ROUTE: Get all available Classes
+// GET /api/classes
+// Returns distinct class_level values that have questions
+// =============================================
+app.get('/api/classes', async (req, res) => {
+    try {
+        const result = await pool.query(
+            'SELECT DISTINCT class_level FROM questions ORDER BY class_level ASC'
+        );
+        return res.json({
+            success: true,
+            classes: result.rows.map(r => r.class_level)
+        });
+    } catch (err) {
+        console.error(err);
+        return res.status(500).json({ success: false, message: 'Database error.' });
+    }
+});
+
+// =============================================
+// ROUTE: Get Branches for a Class (Class 9–12)
+// GET /api/branches?class=9
+// =============================================
+app.get('/api/branches', async (req, res) => {
+    try {
+        const classLevel = parseInt(req.query.class);
+        if (!classLevel) return res.status(400).json({ success: false, message: 'class param required.' });
+
+        const result = await pool.query(
+            `SELECT DISTINCT branch
+             FROM questions
+             WHERE class_level = $1 AND branch IS NOT NULL
+             ORDER BY branch ASC`,
+            [classLevel]
+        );
+        return res.json({
+            success:  true,
+            branches: result.rows.map(r => r.branch)
+        });
+    } catch (err) {
+        console.error(err);
+        return res.status(500).json({ success: false, message: 'Database error.' });
+    }
+});
+
+// =============================================
+// ROUTE: Get Subjects
+// GET /api/subjects?class=6
+// GET /api/subjects?class=9&branch=Science
+// =============================================
+app.get('/api/subjects', async (req, res) => {
+    try {
+        const classLevel = parseInt(req.query.class);
+        const branch     = req.query.branch || null;
+
+        if (!classLevel) return res.status(400).json({ success: false, message: 'class param required.' });
+
+        let result;
+        if (branch) {
+            result = await pool.query(
+                `SELECT DISTINCT subject FROM questions
+                 WHERE class_level = $1 AND branch = $2
+                 ORDER BY subject ASC`,
+                [classLevel, branch]
+            );
+        } else {
+            result = await pool.query(
+                `SELECT DISTINCT subject FROM questions
+                 WHERE class_level = $1
+                 ORDER BY subject ASC`,
+                [classLevel]
+            );
+        }
+
+        return res.json({
+            success:  true,
+            subjects: result.rows.map(r => r.subject)
+        });
+    } catch (err) {
+        console.error(err);
+        return res.status(500).json({ success: false, message: 'Database error.' });
+    }
+});
+
+// =============================================
+// ROUTE: Get Chapters
+// GET /api/chapters?class=6&subject=Mathematics
+// GET /api/chapters?class=9&branch=Science&subject=Physics
+// =============================================
+app.get('/api/chapters', async (req, res) => {
+    try {
+        const classLevel = parseInt(req.query.class);
+        const branch     = req.query.branch  || null;
+        const subject    = req.query.subject || null;
+
+        if (!classLevel || !subject)
+            return res.status(400).json({ success: false, message: 'class and subject params required.' });
+
+        let result;
+        if (branch) {
+            result = await pool.query(
+                `SELECT DISTINCT chapter FROM questions
+                 WHERE class_level = $1 AND branch = $2 AND subject = $3
+                 ORDER BY chapter ASC`,
+                [classLevel, branch, subject]
+            );
+        } else {
+            result = await pool.query(
+                `SELECT DISTINCT chapter FROM questions
+                 WHERE class_level = $1 AND subject = $2
+                 ORDER BY chapter ASC`,
+                [classLevel, subject]
+            );
+        }
+
+        return res.json({
+            success:  true,
+            chapters: result.rows.map(r => r.chapter)
+        });
+    } catch (err) {
+        console.error(err);
+        return res.status(500).json({ success: false, message: 'Database error.' });
+    }
+});
+
+// =============================================
+// ROUTE: Get Random Questions (Quiz)
+// GET /api/questions/random?class=9&branch=Science&subject=Physics&chapter=Chapter 1&count=10
 // =============================================
 app.get('/api/questions/random', async (req, res) => {
     try {
-        const count = parseInt(req.query.count) || 3;
+        const classLevel = req.query.class   ? parseInt(req.query.class) : null;
+        const branch     = req.query.branch  || null;
+        const subject    = req.query.subject || null;
+        const chapter    = req.query.chapter || null;
+        const count      = parseInt(req.query.count) || 10;
+
+        // Build dynamic WHERE clause
+        const conditions = [];
+        const params     = [];
+        let   i          = 1;
+
+        if (classLevel !== null) { conditions.push(`class_level = $${i++}`); params.push(classLevel); }
+        if (branch)               { conditions.push(`branch = $${i++}`);      params.push(branch);     }
+        if (subject)              { conditions.push(`subject = $${i++}`);     params.push(subject);    }
+        if (chapter)              { conditions.push(`chapter = $${i++}`);     params.push(chapter);    }
+
+        const where = conditions.length ? 'WHERE ' + conditions.join(' AND ') : '';
+        params.push(count);
 
         const result = await pool.query(
             `SELECT id, question, option1, option2, option3, option4, correct_answer
              FROM questions
+             ${where}
              ORDER BY RANDOM()
-             LIMIT $1`,
-            [count]
+             LIMIT $${i}`,
+            params
         );
 
         if (result.rows.length === 0) {
             return res.status(404).json({
                 success: false,
-                message: 'No questions found in the database. Please ask the admin to add questions.'
+                message: 'No questions found for this selection. Ask admin to add questions.'
             });
         }
 
-        // Format for frontend consumption
         const questions = result.rows.map(row => ({
-            id:      row.id,
+            id:       row.id,
             question: row.question,
-            options: [row.option1, row.option2, row.option3, row.option4],
-            answer:  row.correct_answer
+            options:  [row.option1, row.option2, row.option3, row.option4],
+            answer:   row.correct_answer
         }));
 
         return res.json({ success: true, questions });
 
     } catch (err) {
-        console.error('Error fetching random questions:', err);
+        console.error(err);
         return res.status(500).json({ success: false, message: 'Database error.' });
     }
 });
 
 // =============================================
-// ROUTE: Get Total Question Count (Public)
-// GET /api/questions/count
+// ROUTE: Question Count (filtered or total)
+// GET /api/questions/count?class=9&branch=Science&subject=Physics&chapter=Chapter 1
 // =============================================
 app.get('/api/questions/count', async (req, res) => {
     try {
-        const result = await pool.query('SELECT COUNT(*) FROM questions');
-        return res.json({
-            success: true,
-            count: parseInt(result.rows[0].count)
-        });
+        const classLevel = req.query.class   ? parseInt(req.query.class) : null;
+        const branch     = req.query.branch  || null;
+        const subject    = req.query.subject || null;
+        const chapter    = req.query.chapter || null;
+
+        const conditions = [];
+        const params     = [];
+        let   i          = 1;
+
+        if (classLevel !== null) { conditions.push(`class_level = $${i++}`); params.push(classLevel); }
+        if (branch)               { conditions.push(`branch = $${i++}`);      params.push(branch);     }
+        if (subject)              { conditions.push(`subject = $${i++}`);     params.push(subject);    }
+        if (chapter)              { conditions.push(`chapter = $${i++}`);     params.push(chapter);    }
+
+        const where  = conditions.length ? 'WHERE ' + conditions.join(' AND ') : '';
+        const result = await pool.query(`SELECT COUNT(*) FROM questions ${where}`, params);
+
+        return res.json({ success: true, count: parseInt(result.rows[0].count) });
     } catch (err) {
-        console.error('Error fetching question count:', err);
+        console.error(err);
         return res.status(500).json({ success: false, message: 'Database error.' });
     }
 });
 
 // =============================================
-// ROUTE: Get All Questions (Admin Only)
+// ADMIN: Get All Questions
 // GET /api/questions
-// Returns full list for admin management view
 // =============================================
 app.get('/api/questions', requireAdmin, async (req, res) => {
     try {
         const result = await pool.query(
-            'SELECT * FROM questions ORDER BY id DESC'
+            'SELECT * FROM questions ORDER BY class_level ASC, branch ASC, subject ASC, chapter ASC, id DESC'
         );
         return res.json({ success: true, questions: result.rows });
     } catch (err) {
-        console.error('Error fetching all questions:', err);
+        console.error(err);
         return res.status(500).json({ success: false, message: 'Database error.' });
     }
 });
 
 // =============================================
-// ROUTE: Add a New Question (Admin Only)
+// ADMIN: Add Question
 // POST /api/questions
-// Body: { question, option1, option2, option3, option4, correct_answer }
 // =============================================
 app.post('/api/questions', requireAdmin, async (req, res) => {
     try {
         const {
-            question,
-            option1, option2, option3, option4,
-            correct_answer
+            question, option1, option2, option3, option4,
+            correct_answer, class_level, branch, subject, chapter
         } = req.body;
 
-        // Validate all fields present
-        if (!question || !option1 || !option2 || !option3 || !option4 || !correct_answer) {
-            return res.status(400).json({
-                success: false,
-                message: 'All fields are required.'
-            });
+        if (!question || !option1 || !option2 || !option3 || !option4 ||
+            !correct_answer || !class_level || !subject || !chapter) {
+            return res.status(400).json({ success: false, message: 'All fields are required.' });
         }
 
-        // Validate correct_answer is one of the options
+        const classNum = parseInt(class_level);
+        if (classNum >= 9 && !branch) {
+            return res.status(400).json({ success: false, message: 'Branch is required for Class 9 and above.' });
+        }
+
         const opts = [option1, option2, option3, option4];
         if (!opts.includes(correct_answer)) {
             return res.status(400).json({
@@ -224,67 +343,56 @@ app.post('/api/questions', requireAdmin, async (req, res) => {
             });
         }
 
-        const result = await pool.query(
-            `INSERT INTO questions (question, option1, option2, option3, option4, correct_answer)
-             VALUES ($1, $2, $3, $4, $5, $6)
-             RETURNING id`,
-            [question, option1, option2, option3, option4, correct_answer]
+        await pool.query(
+            `INSERT INTO questions
+             (question, option1, option2, option3, option4, correct_answer, class_level, branch, subject, chapter)
+             VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`,
+            [question, option1, option2, option3, option4, correct_answer,
+             classNum, classNum >= 9 ? branch : null, subject, chapter]
         );
 
         const countResult = await pool.query('SELECT COUNT(*) FROM questions');
-
         return res.json({
             success:    true,
-            message:    'Question added successfully.',
-            id:         result.rows[0].id,
+            message:    'Question added.',
             totalCount: parseInt(countResult.rows[0].count)
         });
 
     } catch (err) {
-        console.error('Error adding question:', err);
+        console.error(err);
         return res.status(500).json({ success: false, message: 'Database error.' });
     }
 });
 
 // =============================================
-// ROUTE: Delete a Question (Admin Only)
+// ADMIN: Delete Question
 // DELETE /api/questions/:id
 // =============================================
 app.delete('/api/questions/:id', requireAdmin, async (req, res) => {
     try {
         const { id } = req.params;
-
         const check = await pool.query('SELECT id FROM questions WHERE id = $1', [id]);
-        if (check.rows.length === 0) {
+        if (check.rows.length === 0)
             return res.status(404).json({ success: false, message: 'Question not found.' });
-        }
 
         await pool.query('DELETE FROM questions WHERE id = $1', [id]);
-
         const countResult = await pool.query('SELECT COUNT(*) FROM questions');
 
         return res.json({
             success:    true,
-            message:    'Question deleted successfully.',
             totalCount: parseInt(countResult.rows[0].count)
         });
-
     } catch (err) {
-        console.error('Error deleting question:', err);
+        console.error(err);
         return res.status(500).json({ success: false, message: 'Database error.' });
     }
 });
 
-// =============================================
-// Fallback: serve index.html for any unknown route
-// =============================================
+// Fallback
 app.get('*', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
-// =============================================
-// Start Server
-// =============================================
 app.listen(PORT, () => {
     console.log(`\n🚀  MCQSchool is running at: http://localhost:${PORT}`);
     console.log(`📋  Admin panel:              http://localhost:${PORT}/admin.html\n`);
