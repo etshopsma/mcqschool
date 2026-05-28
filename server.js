@@ -22,6 +22,7 @@ const pool = new Pool({
     database: process.env.DB_NAME     || 'mcqschool',
     user:     process.env.DB_USER     || 'postgres',
     password: process.env.DB_PASS     || '',
+    ssl: process.env.DB_SSL === 'true' ? { rejectUnauthorized: false } : false,
 });
 
 // Test DB connection on startup
